@@ -25,6 +25,9 @@ env/
 .DS_Store
 Thumbs.db
 
-# External Sudoku WASM SDK (configure advanced_solver_sdk_dir instead of committing it)
-sdk/
-*.wasm
+# Sudoku WASM SDK extras: keep only minimal runtime files used by the plugin.
+sdk/**/README.md
+sdk/**/THIRD_PARTY*.md
+sdk/**/*.d.ts
+sdk/**/package.json
+sdk/**/*.zip

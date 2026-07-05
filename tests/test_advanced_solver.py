@@ -1,4 +1,3 @@
-import os
 import shutil
 import unittest
 from pathlib import Path
@@ -29,15 +28,11 @@ class AdvancedSolverTests(unittest.TestCase):
         analyzer = AdvancedSudokuAnalyzer(plugin_dir=plugin_dir, sdk_dir=plugin_dir / "missing-sdk", timeout_seconds=5)
         self.assertIn("找不到 sudoku_wasm.js", analyzer.availability_error())
 
-    @unittest.skipIf(
-        shutil.which("node") is None or not os.environ.get("SUDOKU_WASM_SDK_DIR"),
-        "Set SUDOKU_WASM_SDK_DIR and install Node.js to run external WASM SDK test",
-    )
-    def test_external_wasm_one_step(self):
+    @unittest.skipIf(shutil.which("node") is None, "Node.js is required for minimal bundled WASM runtime test")
+    def test_minimal_bundled_wasm_one_step(self):
         plugin_dir = Path(__file__).resolve().parents[1]
         analyzer = AdvancedSudokuAnalyzer(
             plugin_dir=plugin_dir,
-            sdk_dir=Path(os.environ["SUDOKU_WASM_SDK_DIR"]),
             timeout_seconds=5,
         )
         self.assertIsNone(analyzer.availability_error())
