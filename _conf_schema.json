@@ -11,9 +11,23 @@
     "default": 10
   },
   "render_after_each_move": {
-    "description": "每次正确填数或清空后都发送棋盘图片",
+    "description": "保留项：填数反馈后始终发送棋盘图片",
     "type": "bool",
-    "default": true
+    "default": true,
+    "hint": "从 v1.1.0 起，正确、错误、重复、题目格等填数反馈后都会发送当前棋盘图片。"
+  },
+  "show_candidates": {
+    "description": "棋盘图片中显示空格候选数",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，空格中显示 1-9 候选数；候选数来源可通过 candidate_source 配置。"
+  },
+  "candidate_source": {
+    "description": "候选数来源",
+    "type": "string",
+    "default": "auto",
+    "options": ["auto", "local", "wasm"],
+    "hint": "auto 优先使用 WASM 高级引擎，失败后降级本地候选数；local 只使用本地基础候选数；wasm 优先高级引擎。"
   },
   "allow_answer": {
     "description": "允许用户查看答案",
@@ -37,5 +51,32 @@
     "type": "float",
     "default": 0.08,
     "hint": "按难度基础分乘以该比例扣分。"
+  },
+  "advanced_solver_enabled": {
+    "description": "启用 WASM 高级解题模式",
+    "type": "bool",
+    "default": true
+  },
+  "advanced_solver_sdk_dir": {
+    "description": "WASM SDK 目录",
+    "type": "string",
+    "default": "",
+    "hint": "留空使用插件内置 sdk/sudoku-wasm；也可以填写外部 sudoku-wasm 目录。"
+  },
+  "node_executable": {
+    "description": "Node.js 可执行文件",
+    "type": "string",
+    "default": "node",
+    "hint": "高级解题模式通过 Node.js 调用 sudoku-wasm SDK。"
+  },
+  "advanced_solver_timeout_seconds": {
+    "description": "高级解题分析超时时间（秒）",
+    "type": "float",
+    "default": 5.0
+  },
+  "advanced_solver_max_steps": {
+    "description": "高级解题输出最多步骤数",
+    "type": "int",
+    "default": 5
   }
 }

@@ -19,6 +19,13 @@ _PLUGIN_DIR = Path(__file__).resolve().parent
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
 
+from sudoku_super.advanced_solver import (
+    AdvancedSolverError,
+    AdvancedSudokuAnalyzer,
+    format_analysis,
+    local_candidate_lists,
+    normalize_analysis_mode,
+)
 from sudoku_super.commands import normalize_rank_scope, parse_command_value, parse_move_text
 from sudoku_super.generator import GenerationTimeout, SudokuGenerator
 from sudoku_super.models import ActiveGame, DIFFICULTIES, Move, normalize_difficulty
@@ -30,12 +37,13 @@ from sudoku_super.storage import SudokuStorage
 PLUGIN_NAME = "astrbot_plugin_sudoku_super"
 
 
-@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.0.0")
+@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.0")
 class SudokuSuperPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
         self.config = config or {}
         self.storage = SudokuStorage(self._resolve_data_dir())
+        self.advanced_analyzer = self._create_advanced_analyzer()
 
     async def initialize(self):
         logger.info("Sudoku Super 插件已加载")
@@ -143,6 +151,45 @@ class SudokuSuperPlugin(Star):
         else:
             yield event.plain_result(f"当前没有冲突。剩余空格：{game.empty_count}，错误次数：{game.mistakes}")
         async for result in self._board_results(event, game, title="数独检查", conflict_cells=conflicts):
+            yield result
+
+    @sudoku.command("hint")
+    async def hint(self, event: AstrMessageEvent, mode: str = "one_step"):
+        """使用高级解题引擎给出下一步提示。"""
+        async for result in self._hint_results(event, mode, title="高级解题提示"):
+            yield result
+
+    @sudoku.command("advanced")
+    async def advanced(self, event: AstrMessageEvent, mode: str = "one_step"):
+        """高级解题模式：one_step 下一步分析，full_path 完整路径。"""
+        async for result in self._hint_results(event, mode, title="高级解题模式"):
+            yield result
+
+    @sudoku.command("analyze")
+    async def analyze(self, event: AstrMessageEvent, mode: str = "full_path"):
+        """高级分析当前盘面。用法：/sudoku analyze full_path"""
+        game = self._active_game_for_event(event)
+        if not game:
+            yield event.plain_result("你当前没有进行中的数独。")
+            return
+        try:
+            normalized_mode = normalize_analysis_mode(mode)
+        except ValueError as exc:
+            yield event.plain_result(str(exc))
+            return
+        if not self._config_bool("advanced_solver_enabled", True):
+            yield event.plain_result("高级解题引擎已在配置中关闭。")
+            async for result in self._board_results(event, game, title="当前数独棋盘"):
+                yield result
+            return
+        try:
+            analysis = await asyncio.to_thread(self.advanced_analyzer.analyze, game.current, mode=normalized_mode)
+            yield event.plain_result(
+                format_analysis(analysis, max_steps=self._config_int("advanced_solver_max_steps", 5))
+            )
+        except AdvancedSolverError as exc:
+            yield event.plain_result(f"高级解题引擎不可用：{exc}")
+        async for result in self._board_results(event, game, title="高级盘面分析"):
             yield result
 
     @sudoku.command("undo")
@@ -260,6 +307,10 @@ class SudokuSuperPlugin(Star):
     async def _handle_move(self, event: AstrMessageEvent, move: Move):
         if not (0 <= move.row <= 8 and 0 <= move.col <= 8):
             yield event.plain_result("行列范围必须是 1-9。")
+            game = self._active_game_for_event(event)
+            if game:
+                async for result in self._board_results(event, game, title="当前数独棋盘"):
+                    yield result
             return
         game = self._active_game_for_event(event)
         if not game:
@@ -269,21 +320,24 @@ class SudokuSuperPlugin(Star):
         label = f"第 {move.row + 1} 行第 {move.col + 1} 列"
         if game.fixed[idx]:
             yield event.plain_result(f"{label} 是题目给定格，不能修改。")
+            async for result in self._board_results(event, game, title="当前数独棋盘"):
+                yield result
             return
         game.user_name = self._user_name(event)
         now = time.time()
         if move.value == 0:
             if game.current[idx] == 0:
                 yield event.plain_result(f"{label} 已经是空格。")
+                async for result in self._board_results(event, game, title="当前数独棋盘"):
+                    yield result
                 return
             self._push_history(game)
             game.current[idx] = 0
             game.updated_at = now
             self.storage.save_active_game(game)
             yield event.plain_result(f"已清空{label}。")
-            if self._config_bool("render_after_each_move", True):
-                async for result in self._board_results(event, game, title="清空后棋盘"):
-                    yield result
+            async for result in self._board_results(event, game, title="清空后棋盘"):
+                yield result
             return
 
         if move.value != game.solution[idx]:
@@ -293,10 +347,14 @@ class SudokuSuperPlugin(Star):
             yield event.plain_result(
                 f"❌ {label} 填 {move.value} 不正确，已计入错误次数。当前错误：{game.mistakes}"
             )
+            async for result in self._board_results(event, game, title="当前数独棋盘"):
+                yield result
             return
 
         if game.current[idx] == move.value:
             yield event.plain_result(f"{label} 已经是 {move.value}。")
+            async for result in self._board_results(event, game, title="当前数独棋盘"):
+                yield result
             return
 
         self._push_history(game)
@@ -308,9 +366,34 @@ class SudokuSuperPlugin(Star):
             return
         self.storage.save_active_game(game)
         yield event.plain_result(f"✅ 已填入：{label} = {move.value}。剩余空格：{game.empty_count}")
-        if self._config_bool("render_after_each_move", True):
-            async for result in self._board_results(event, game, title="填数后棋盘"):
-                yield result
+        async for result in self._board_results(event, game, title="填数后棋盘"):
+            yield result
+
+    async def _hint_results(self, event: AstrMessageEvent, mode: str, *, title: str):
+        game = self._active_game_for_event(event)
+        if not game:
+            yield event.plain_result("你当前没有进行中的数独。")
+            return
+        try:
+            normalized_mode = normalize_analysis_mode(mode)
+        except ValueError as exc:
+            yield event.plain_result(str(exc))
+            return
+        try:
+            if not self._config_bool("advanced_solver_enabled", True):
+                raise AdvancedSolverError("配置 advanced_solver_enabled 已关闭")
+            analysis = await asyncio.to_thread(self.advanced_analyzer.analyze, game.current, mode=normalized_mode)
+            yield event.plain_result(
+                format_analysis(analysis, max_steps=self._config_int("advanced_solver_max_steps", 5))
+            )
+        except AdvancedSolverError as exc:
+            yield event.plain_result(
+                "高级解题引擎不可用，已使用基础候选数提示。\n"
+                f"原因：{exc}\n"
+                + self._basic_hint_text(game)
+            )
+        async for result in self._board_results(event, game, title=title):
+            yield result
 
     async def _complete_game(self, event: AstrMessageEvent, game: ActiveGame):
         elapsed = max(0.0, time.time() - game.started_at)
@@ -362,6 +445,8 @@ class SudokuSuperPlugin(Star):
                 title=title,
                 reveal_solution=reveal_solution,
                 conflict_cells=conflict_cells,
+                show_candidates=self._config_bool("show_candidates", False) and not reveal_solution,
+                candidates=await self._candidate_lists(game) if self._config_bool("show_candidates", False) and not reveal_solution else None,
                 now=time.time(),
             )
             return await self.html_render(
@@ -376,6 +461,20 @@ class SudokuSuperPlugin(Star):
         except Exception as exc:  # pragma: no cover - depends on AstrBot runtime renderer.
             logger.warning(f"数独棋盘 HTML 渲染失败，将降级为文本棋盘：{exc}")
             return None
+
+    async def _candidate_lists(self, game: ActiveGame) -> list[list[str]]:
+        source = str(self.config.get("candidate_source", "auto")).strip().casefold()
+        if source in {"wasm", "advanced", "auto"} and self._config_bool("advanced_solver_enabled", True):
+            try:
+                analysis = await asyncio.to_thread(self.advanced_analyzer.analyze, game.current, mode="one_step")
+                if analysis.ok and analysis.candidates:
+                    return analysis.candidates
+            except Exception as exc:
+                if source in {"wasm", "advanced"}:
+                    logger.warning(f"高级候选数获取失败，降级到本地候选数：{exc}")
+                else:
+                    logger.debug(f"高级候选数获取失败，降级到本地候选数：{exc}")
+        return local_candidate_lists(game.current)
 
     def _active_game_for_event(self, event: AstrMessageEvent) -> ActiveGame | None:
         return self.storage.get_active_game(self._session_id(event), self._user_id(event))
@@ -393,6 +492,28 @@ class SudokuSuperPlugin(Star):
             return Path(get_astrbot_data_path()) / "plugin_data" / PLUGIN_NAME
         except Exception:
             return Path(__file__).resolve().parent / "data" / PLUGIN_NAME
+
+    def _create_advanced_analyzer(self) -> AdvancedSudokuAnalyzer:
+        raw_sdk_dir = str(self.config.get("advanced_solver_sdk_dir", "") or "").strip()
+        sdk_dir = Path(raw_sdk_dir) if raw_sdk_dir else _PLUGIN_DIR / "sdk" / "sudoku-wasm"
+        return AdvancedSudokuAnalyzer(
+            plugin_dir=_PLUGIN_DIR,
+            sdk_dir=sdk_dir,
+            node_executable=str(self.config.get("node_executable", "node") or "node"),
+            timeout_seconds=self._config_float("advanced_solver_timeout_seconds", 5.0),
+        )
+
+    @staticmethod
+    def _basic_hint_text(game: ActiveGame) -> str:
+        candidates = local_candidate_lists(game.current)
+        best: tuple[int, list[str]] | None = None
+        for idx, values in enumerate(candidates):
+            if game.current[idx] == 0 and values and (best is None or len(values) < len(best[1])):
+                best = (idx, values)
+        if best is None:
+            return "基础提示：当前没有可用候选数提示。"
+        idx, values = best
+        return f"基础提示：R{idx // 9 + 1}C{idx % 9 + 1} 的候选数为 {'/'.join(values)}。"
 
     @staticmethod
     def _session_id(event: AstrMessageEvent) -> str:
@@ -468,6 +589,9 @@ class SudokuSuperPlugin(Star):
             "/sudoku set <行> <列> <数字> - 填数，数字 0 或“清空”表示清除\n"
             "/sudoku board - 查看棋盘\n"
             "/sudoku check - 检查进度\n"
+            "/sudoku hint [one_step|full_path] - 高级解题提示\n"
+            "/sudoku advanced [one_step|full_path] - 高级解题模式\n"
+            "/sudoku analyze [one_step|full_path] - 高级分析当前盘面\n"
             "/sudoku undo - 撤销上一步\n"
             "/sudoku giveup - 放弃并查看答案\n"
             "/sudoku answer - 查看答案并结束本局\n"

@@ -81,6 +81,26 @@ BOARD_TEMPLATE = r"""
       color: #fff;
       background: #cf3f3f;
     }
+    .candidates {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 6px;
+      color: #897c70;
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 600;
+    }
+    .candidates span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 0;
+    }
     .footer {
       display: flex;
       justify-content: space-between;
@@ -107,7 +127,19 @@ BOARD_TEMPLATE = r"""
       {% for row in rows %}
       <tr>
         {% for cell in row %}
-        <td class="{{ cell.classes }}">{{ cell.value }}</td>
+        <td class="{{ cell.classes }}">
+          {% if cell.value %}
+            {{ cell.value }}
+          {% elif show_candidates and cell.candidates %}
+            <div class="candidates">
+              {% for candidate in cell.candidates %}
+                <span>{{ candidate }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            ·
+          {% endif %}
+        </td>
         {% endfor %}
       </tr>
       {% endfor %}
@@ -129,6 +161,8 @@ def build_board_data(
     subtitle: str = "发送 /sudoku set 行 列 数字，或直接发送：行 列 数字",
     reveal_solution: bool = False,
     conflict_cells: set[int] | None = None,
+    show_candidates: bool = False,
+    candidates: list[list[str]] | None = None,
     now: float | None = None,
 ) -> dict:
     board = game.solution if reveal_solution else game.current
@@ -156,7 +190,17 @@ def build_board_data(
                 classes.append("box-right")
             if r in {2, 5}:
                 classes.append("box-bottom")
-            row.append({"value": str(value) if value else "·", "classes": " ".join(classes)})
+            candidate_marks = [""] * 9
+            if show_candidates and not value and candidates and idx < len(candidates):
+                candidate_set = {str(v) for v in candidates[idx]}
+                candidate_marks = [str(i) if str(i) in candidate_set else "" for i in range(1, 10)]
+            row.append(
+                {
+                    "value": str(value) if value else "",
+                    "classes": " ".join(classes),
+                    "candidates": candidate_marks,
+                }
+            )
         rows.append(row)
 
     elapsed = 0.0 if now is None else max(0.0, now - game.started_at)
@@ -169,6 +213,7 @@ def build_board_data(
         "mistakes": game.mistakes,
         "elapsed": format_duration(elapsed),
         "rows": rows,
+        "show_candidates": show_candidates,
     }
 
 
