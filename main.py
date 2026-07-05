@@ -19,6 +19,13 @@ _PLUGIN_DIR = Path(__file__).resolve().parent
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
 
+# AstrBot can hot-reload main.py while leaving sibling modules in sys.modules.
+# Drop this plugin's internal package cache so updated helpers (for example
+# render.build_board_data signatures) are re-imported after plugin upgrades.
+for _module_name in list(sys.modules):
+    if _module_name == "sudoku_super" or _module_name.startswith("sudoku_super."):
+        del sys.modules[_module_name]
+
 from sudoku_super.advanced_solver import (
     AdvancedSolverError,
     AdvancedSudokuAnalyzer,
@@ -37,7 +44,7 @@ from sudoku_super.storage import SudokuStorage
 PLUGIN_NAME = "astrbot_plugin_sudoku_super"
 
 
-@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.0")
+@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.1")
 class SudokuSuperPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
