@@ -58,10 +58,10 @@
     "default": true
   },
   "advanced_solver_sdk_dir": {
-    "description": "WASM SDK 目录",
+    "description": "外部 WASM SDK 目录",
     "type": "string",
     "default": "",
-    "hint": "留空使用插件内置 sdk/sudoku-wasm；也可以填写外部 sudoku-wasm 目录。"
+    "hint": "插件仓库不内置完整 SDK；请填写本机 sudoku-wasm 目录。留空时高级引擎不可用并自动降级。"
   },
   "node_executable": {
     "description": "Node.js 可执行文件",

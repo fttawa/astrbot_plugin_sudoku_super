@@ -24,3 +24,7 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+
+# External Sudoku WASM SDK (configure advanced_solver_sdk_dir instead of committing it)
+sdk/
+*.wasm

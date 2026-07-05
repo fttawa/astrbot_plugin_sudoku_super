@@ -44,7 +44,7 @@ from sudoku_super.storage import SudokuStorage
 PLUGIN_NAME = "astrbot_plugin_sudoku_super"
 
 
-@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.2")
+@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.3")
 class SudokuSuperPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
@@ -505,7 +505,11 @@ class SudokuSuperPlugin(Star):
 
     def _create_advanced_analyzer(self) -> AdvancedSudokuAnalyzer:
         raw_sdk_dir = str(self.config.get("advanced_solver_sdk_dir", "") or "").strip()
-        sdk_dir = Path(raw_sdk_dir) if raw_sdk_dir else _PLUGIN_DIR / "sdk" / "sudoku-wasm"
+        if not raw_sdk_dir:
+            import os
+
+            raw_sdk_dir = os.environ.get("SUDOKU_WASM_SDK_DIR", "").strip()
+        sdk_dir = Path(raw_sdk_dir) if raw_sdk_dir else _PLUGIN_DIR / "_external_sudoku_wasm_sdk_not_configured"
         return AdvancedSudokuAnalyzer(
             plugin_dir=_PLUGIN_DIR,
             sdk_dir=sdk_dir,
