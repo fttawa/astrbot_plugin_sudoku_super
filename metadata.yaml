@@ -2,6 +2,6 @@ name: astrbot_plugin_sudoku_super
 display_name: Sudoku Super
 desc: 为 AstrBot 提供数独题目挑战、五档难度生成、棋盘图片、用户解题与排行榜。
 short_desc: 五档难度数独挑战与排行榜插件。
-version: v1.1.1
+version: v1.1.2
 author: fttawa
 repo: https://github.com/fttawa/astrbot_plugin_sudoku_super

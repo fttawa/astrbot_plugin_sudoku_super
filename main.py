@@ -44,7 +44,7 @@ from sudoku_super.storage import SudokuStorage
 PLUGIN_NAME = "astrbot_plugin_sudoku_super"
 
 
-@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.1")
+@register(PLUGIN_NAME, "fttawa", "带题目生成、棋盘图片、解题挑战和排行榜的数独插件", "1.1.2")
 class SudokuSuperPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
@@ -303,9 +303,12 @@ class SudokuSuperPlugin(Star):
         # 无活跃对局时忽略，避免普通聊天中的数字被打断。
         if not self._active_game_for_event(event):
             return
-        event.stop_event()
         async for result in self._handle_move(event, move):
             yield result
+        # Stop propagation only after all responses have been yielded. Calling
+        # this before yielding can make AstrBot stop after the first text
+        # response and skip the following board image.
+        event.stop_event()
 
     async def terminate(self):
         self.storage.close()
