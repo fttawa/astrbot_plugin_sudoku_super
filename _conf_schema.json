@@ -1,0 +1,41 @@
+{
+  "generate_timeout_seconds": {
+    "description": "单次生成数独题目的超时时间（秒）",
+    "type": "float",
+    "default": 12.0,
+    "hint": "地狱/恶魔难度需要更长生成时间；超时会提示用户重试，不会发放近似题。"
+  },
+  "leaderboard_limit": {
+    "description": "排行榜展示条数",
+    "type": "int",
+    "default": 10
+  },
+  "render_after_each_move": {
+    "description": "每次正确填数或清空后都发送棋盘图片",
+    "type": "bool",
+    "default": true
+  },
+  "allow_answer": {
+    "description": "允许用户查看答案",
+    "type": "bool",
+    "default": true,
+    "hint": "查看答案会结束当前对局，且不计入排行榜。"
+  },
+  "max_history": {
+    "description": "每局可保留的撤销历史步数",
+    "type": "int",
+    "default": 30
+  },
+  "time_bonus_ratio": {
+    "description": "计分中的时间奖励比例",
+    "type": "float",
+    "default": 0.5,
+    "hint": "越快完成奖励越高，0 表示关闭时间奖励。"
+  },
+  "mistake_penalty_rate": {
+    "description": "每次错误的扣分比例",
+    "type": "float",
+    "default": 0.08,
+    "hint": "按难度基础分乘以该比例扣分。"
+  }
+}
