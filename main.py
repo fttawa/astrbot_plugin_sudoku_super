@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -10,6 +11,13 @@ from typing import Any
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+
+# AstrBot v4.26.x imports plugin main.py from the core package context, and
+# the plugin directory is not always present on sys.path. Add it explicitly so
+# sibling packages such as sudoku_super can be imported reliably after install.
+_PLUGIN_DIR = Path(__file__).resolve().parent
+if str(_PLUGIN_DIR) not in sys.path:
+    sys.path.insert(0, str(_PLUGIN_DIR))
 
 from sudoku_super.commands import normalize_rank_scope, parse_command_value, parse_move_text
 from sudoku_super.generator import GenerationTimeout, SudokuGenerator
